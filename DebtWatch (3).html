@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DebtWatch</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:sans-serif;margin:0;background:#111;color:#eee;padding-bottom:72px}
+header{background:#1e1e1e;padding:12px;font-size:18px;font-weight:bold;position:sticky;top:0;z-index:5}
+.page{display:none;padding:12px}.page.on{display:block}
+.card{background:#1e1e1e;border-radius:10px;padding:10px;margin-bottom:10px}
+input,select,button{width:100%;padding:10px;margin:3px 0;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#eee;font-size:15px}
+button{background:#3b82f6;border:0;font-weight:bold}
+button.red{background:#b91c1c}
+.row{display:flex;gap:6px}.row>*{flex:1}
+.item{border-bottom:1px solid #333;padding:8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.acts{display:flex;gap:4px}
+.acts button{width:auto;padding:6px 10px;margin:0}
+.bar{background:#3b82f6;height:14px;border-radius:3px;margin-bottom:6px}
+.bar.g{background:#22c55e}
+.kpi{display:flex;gap:8px;margin-bottom:10px}
+.kpi div{flex:1;background:#1e1e1e;border-radius:10px;padding:10px;text-align:center}
+.kpi b{display:block;font-size:22px;color:#60a5fa}
+.banner{background:#7c2d12;border-radius:10px;padding:10px;margin-bottom:10px}
+small{color:#aaa}
+nav{position:fixed;bottom:0;left:0;right:0;background:#1e1e1e;display:flex;overflow-x:auto;border-top:1px solid #333;z-index:10}
+nav button{flex:0 0 auto;min-width:68px;width:auto;background:none;border-radius:0;margin:0;padding:8px 6px;font-size:12px;color:#aaa;border:0;position:relative}
+nav button.on{color:#60a5fa}
+nav span{display:block;font-size:20px}
+.badge{position:absolute;top:2px;right:10px;background:#dc2626;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal div{padding:8px 0;border-radius:6px;background:#2a2a2a;font-size:14px}
+.cal .h{background:none;color:#aaa;font-size:12px}
+.cal .e{background:none}
+.cal .late{background:#b91c1c}.cal .soon{background:#c2410c}
+.cal .mid{background:#a16207}.cal .long{background:#15803d}
+.cal .sel{outline:2px solid #60a5fa}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.calhead button{width:50px}
+</style></head><body>
+<header>📊 DebtWatch</header>
+
+<!-- الرئيسية -->
+<div class="page on" id="p-home">
+ <div id="banner"></div>
+ <div class="kpi">
+  <div><b id="k1">0</b><small>ديون قائمة</small></div>
+  <div><b id="k2">0</b><small>عاجلة</small></div>
+  <div><b id="k3">0</b><small>متأخرة</small></div>
+ </div>
+ <div class="card" id="sum"></div>
+ <div class="card"><b>أقرب الاستحقاقات</b><div id="next"></div></div>
+ <div class="card"><b>الاستحقاق الشهري</b><div id="chart"></div></div>
+</div>
+
+<!-- الديون + بحث -->
+<div class="page" id="p-debts">
+ <div class="card">
+  <input id="q" placeholder="🔍 ابحث باسم الدائن" oninput="render()">
+  <select id="fs" onchange="render()">
+   <option value="">كل الحالات</option>
+   <option value="late">🔴 متأخر</option>
+   <option value="soon">🟠 قريب</option>
+   <option value="mid">🟡 متوسط</option>
+   <option value="long">🟢 طويل</option>
+   <option value="paid">✅ مسدد</option>
+  </select>
+ </div>
+ <div class="card"><div id="list"></div></div>
+</div>
+
+<!-- إضافة -->
+<div class="page" id="p-add">
+ <div class="card">
+  <b>إضافة دين جديد</b>
+  <input id="cr" placeholder="الدائن">
+  <div class="row"><input id="am" type="number" placeholder="المبلغ">
+  <select id="cu"><option>DZD</option><option>USD</option><option>EUR</option></select></div>
+  <div class="row"><input id="rt" type="number" step="0.1" placeholder="الفائدة %">
+  <input id="dt" type="date"></div>
+  <button onclick="addDebt()">➕ إضافة</button>
+ </div>
+</div>
+
+<!-- التقويم -->
+<div class="page" id="p-cal">
+ <div class="card">
+  <div class="calhead">
+   <button onclick="calMove(-1)">▶</button>
+   <b id="calT"></b>
+   <button onclick="calMove(1)">◀</button>
+  </div>
+  <div class="cal" id="calG"></div>
+  <small>اضغط على يوم ملوّن لرؤية ديونه</small>
+ </div>
+ <div class="card"><div id="calL">اختر يوماً</div></div>
+</div>
+
+<!-- الإحصائيات -->
+<div class="page" id="p-stats">
+ <div class="card" id="st1"></div>
+ <div class="card"><b>الديون المتبقية حسب الدائن</b><div id="st2"></div></div>
+ <div class="card" id="st3"></div>
+</div>
+
+<!-- السداد -->
+<div class="page" id="p-pay">
+ <div class="card">
+  <b>تسجيل دفعة</b>
+  <select id="pd"></select>
+  <div class="row"><input id="pa" type="number" placeholder="مبلغ الدفعة">
+  <input id="pt" type="date"></div>
+  <button onclick="addPay()">💰 تسجيل الدفعة</button>
+ </div>
+ <div class="card"><b>سجل المدفوعات</b><div id="pl"></div></div>
+</div>
+
+<!-- التنبيهات -->
+<div class="page" id="p-alert">
+ <div class="card"><b>🔴 متأخرة</b><div id="al1"></div></div>
+ <div class="card"><b>🟠 قريبة الاستحقاق</b><div id="al2"></div></div>
+</div>
+
+<!-- الحاسبة -->
+<div class="page" id="p-calc">
+ <div class="card">
+  <b>حاسبة القسط</b>
+  <input id="c1" type="number" placeholder="مبلغ الدين">
+  <input id="c2" type="number" step="0.1" placeholder="الفائدة السنوية %">
+  <input id="c3" type="number" placeholder="المدة بالأشهر">
+  <button onclick="calc()">🧮 احسب</button>
+  <div id="cres"></div>
+ </div>
+</div>
+
+<!-- البيانات -->
+<div class="page" id="p-data">
+ <div class="card">أيام التنبيه:
+  <input id="al" type="number" value="30" onchange="try{localStorage.setItem('al',this.value)}catch(e){};render()">
+ </div>
+ <div class="card">
+  <b>استيراد CSV</b>
+  <input type="file" id="f" accept=".csv" onchange="importCSV(this)">
+  <small>الأعمدة: الدائن,المبلغ,العملة,الفائدة,التاريخ,المسدد(اختياري)</small>
+  <button onclick="exportCSV()">⬇️ تصدير CSV</button>
+ </div>
+ <div class="card"><button class="red" onclick="clearAll()">🗑️ مسح كل البيانات</button></div>
+</div>
+
+<nav>
+ <button data-p="home" class="on" onclick="go('home')"><span>🏠</span>الرئيسية</button>
+ <button data-p="debts" onclick="go('debts')"><span>🔍</span>الديون</button>
+ <button data-p="add" onclick="go('add')"><span>➕</span>إضافة</button>
+ <button data-p="cal" onclick="go('cal')"><span>📅</span>التقويم</button>
+ <button data-p="stats" onclick="go('stats')"><span>📈</span>إحصائيات</button>
+ <button data-p="pay" onclick="go('pay')"><span>💰</span>السداد</button>
+ <button data-p="alert" onclick="go('alert')"><span>🔔</span>تنبيهات<i class="badge" id="bd" style="display:none"></i></button>
+ <button data-p="calc" onclick="go('calc')"><span>🧮</span>الحاسبة</button>
+ <button data-p="data" onclick="go('data')"><span>⚙️</span>البيانات</button>
+</nav>
+
+<script>
+const $=id=>document.getElementById(id);
+const sample=[
+{c:"بنك أ",a:500000,u:"DZD",r:5.5,d:"2026-11-25"},
+{c:"بنك ب",a:250000,u:"USD",r:4.2,d:"2027-01-15"},
+{c:"مورد ج",a:80000,u:"DZD",r:0,d:"2026-11-10"},
+{c:"سندات د",a:1200000,u:"USD",r:6,d:"2027-06-30"}];
+function load(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v||d}catch(e){return d}}
+let debts=load("debts",sample), pays=load("pays",[]);
+debts.forEach((x,i)=>{if(!x.id)x.id=Date.now()+i;if(!x.p)x.p=0});
+try{const a=localStorage.getItem("al");if(a)$("al").value=a}catch(e){}
+function save(){try{localStorage.setItem("debts",JSON.stringify(debts));localStorage.setItem("pays",JSON.stringify(pays))}catch(e){}}
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+$("pt").value=today();
+const rem=x=>Math.max(0,x.a-(x.p||0));
+const days=d=>{const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(d)-t)/864e5)};
+const st=(n,al)=>n<0?"late":n<=al?"soon":n<=180?"mid":"long";
+const label={late:"🔴 متأخر",soon:"🟠 قريب",mid:"🟡 متوسط",long:"🟢 طويل",paid:"✅ مسدد"};
+const fmt=x=>Number(x).toLocaleString("en-US",{maximumFractionDigits:2});
+const AL=()=>+$("al").value||30;
+const active=()=>debts.filter(x=>rem(x)>0);
+const lines=o=>Object.keys(o).length?Object.entries(o).map(([k,v])=>fmt(v)+" "+k).join("<br>"):"لا يوجد";
+
+function go(p){
+ document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));
+ $("p-"+p).classList.add("on");
+ document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+ const b=document.querySelector('nav button[data-p="'+p+'"]');
+ b.classList.add("on");b.scrollIntoView({inline:"center",block:"nearest"});
+ window.scrollTo(0,0);
+}
+function addDebt(){
+ const c=$("cr").value.trim(),a=+$("am").value,d=$("dt").value;
+ if(!c||!a||!d){alert("أكمل الدائن والمبلغ والتاريخ");return}
+ debts.push({id:Date.now(),c,a,p:0,u:$("cu").value,r:+$("rt").value||0,d});save();
+ $("cr").value=$("am").value=$("rt").value=$("dt").value="";
+ render();alert("تمت الإضافة ✅");
+}
+function del(id){if(confirm("حذف هذا الدين؟")){debts=debts.filter(x=>x.id!==id);save();render()}}
+function item(x,al){
+ const r=rem(x),n=days(x.d),s=r<=0?"paid":st(n,al);
+ return `<div class="item"><div>${x.c} — ${fmt(r)} ${x.u}<br>
+ <small>الأصل ${fmt(x.a)} • المسدد ${fmt(x.p||0)}<br>${x.d} • ${n} يوم • ${x.r}%</small><br>${label[s]}</div>
+ <div class="acts">${r>0?`<button onclick="payFor(${x.id})">💰</button>`:""}
+ <button class="red" onclick="del(${x.id})">✕</button></div></div>`;
+}
+function payFor(id){go("pay");$("pd").value=id}
+
+/* السداد */
+function addPay(){
+ const id=+$("pd").value,amt=+$("pa").value,date=$("pt").value||today();
+ const x=debts.find(y=>y.id===id);
+ if(!x||!amt||amt<=0){alert("اختر ديناً وأدخل مبلغاً");return}
+ if(amt>rem(x)){alert("المبلغ أكبر من المتبقي ("+fmt(rem(x))+")");return}
+ x.p=(x.p||0)+amt;
+ pays.unshift({id:Date.now(),did:id,c:x.c,u:x.u,amt,date});
+ save();$("pa").value="";render();alert("تم تسجيل الدفعة ✅");
+}
+function undoPay(pid){
+ const p=pays.find(y=>y.id===pid);if(!p||!confirm("إلغاء هذه الدفعة؟"))return;
+ const x=debts.find(y=>y.id===p.did);if(x)x.p=Math.max(0,(x.p||0)-p.amt);
+ pays=pays.filter(y=>y.id!==pid);save();render();
+}
+
+/* التقويم */
+let cy=new Date().getFullYear(),cm=new Date().getMonth();
+const MN=["جانفي","فيفري","مارس","أفريل","ماي","جوان","جويلية","أوت","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+function calMove(k){cm+=k;if(cm<0){cm=11;cy--}if(cm>11){cm=0;cy++}renderCal()}
+function renderCal(sel){
+ $("calT").textContent=MN[cm]+" "+cy;
+ const al=AL(),first=(new Date(cy,cm,1).getDay()+1)%7,nd=new Date(cy,cm+1,0).getDate();
+ let h=["سب","أح","إث","ث","أر","خم","جم"].map(x=>`<div class="h">${x}</div>`).join("");
+ for(let i=0;i<first;i++)h+='<div class="e"></div>';
+ for(let d=1;d<=nd;d++){
+  const key=cy+"-"+String(cm+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+  const ds=active().filter(x=>x.d===key);
+  let cls="";if(ds.length){const order=["late","soon","mid","long"];cls=order.find(o=>ds.some(x=>st(days(x.d),al)===o))}
+  h+=`<div class="${cls} ${sel===key?"sel":""}" onclick="calDay('${key}')">${d}</div>`;
+ }
+ $("calG").innerHTML=h;
+}
+function calDay(key){
+ renderCal(key);
+ const ds=active().filter(x=>x.d===key),al=AL();
+ $("calL").innerHTML="<b>"+key+"</b>"+(ds.map(x=>item(x,al)).join("")||"<br>لا توجد استحقاقات");
+}
+
+/* الحاسبة */
+function calc(){
+ const P=+$("c1").value,rate=+$("c2").value||0,n=+$("c3").value;
+ if(!P||!n){alert("أدخل المبلغ والمدة");return}
+ const r=rate/1200;
+ const m=r?P*r/(1-Math.pow(1+r,-n)):P/n;
+ const tot=m*n;
+ $("cres").innerHTML=`<div class="card" style="margin-top:8px">القسط الشهري: <b>${fmt(m)}</b><br>
+ المجموع الكلي: <b>${fmt(tot)}</b><br>إجمالي الفائدة: <b>${fmt(tot-P)}</b></div>`;
+}
+
+/* التصدير والاستيراد */
+function importCSV(inp){
+ const r=new FileReader();
+ r.onload=()=>{
+  r.result.replace(/^\ufeff/,"").split(/\r?\n/).filter(l=>l.trim()).slice(1).forEach((l,i)=>{
+   const p=l.split(",");
+   if(p.length>=5)debts.push({id:Date.now()+i,c:p[0],a:+p[1],u:p[2],r:+p[3]||0,d:p[4].trim(),p:+p[5]||0})});
+  save();render();alert("تم الاستيراد ✅");};
+ r.readAsText(inp.files[0]);
+}
+function exportCSV(){
+ const s="الدائن,المبلغ,العملة,الفائدة,التاريخ,المسدد\n"+debts.map(x=>[x.c,x.a,x.u,x.r,x.d,x.p||0].join(",")).join("\n");
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob(["\ufeff"+s],{type:"text/csv"}));
+ a.download="debts.csv";a.click();
+}
+function clearAll(){if(confirm("مسح كل الديون والمدفوعات؟")){debts=[];pays=[];save();render()}}
+
+/* الرسم الرئيسي */
+function render(){
+ const al=AL();
+ debts.sort((x,y)=>new Date(x.d)-new Date(y.d));
+ const act=active(),tot={},urg={};let uc=0,lc=0;
+ act.forEach(x=>{const r=rem(x),n=days(x.d);tot[x.u]=(tot[x.u]||0)+r;
+  if(n<=al){urg[x.u]=(urg[x.u]||0)+r;uc++}if(n<0)lc++});
+
+ // الرئيسية
+ $("k1").textContent=act.length;$("k2").textContent=uc;$("k3").textContent=lc;
+ $("sum").innerHTML="<b>المتبقي:</b><br>"+lines(tot)+"<br><b>عاجل:</b><br>"+lines(urg);
+ $("next").innerHTML=act.slice(0,3).map(x=>item(x,al)).join("")||"لا توجد ديون";
+ const m={};act.forEach(x=>{const k=x.d.slice(0,7)+" "+x.u;m[k]=(m[k]||0)+rem(x)});
+ const mx=Math.max(1,...Object.values(m));
+ $("chart").innerHTML=Object.keys(m).sort().map(k=>
+  `<small>${k}: ${fmt(m[k])}</small><div class="bar" style="width:${m[k]/mx*100}%"></div>`).join("")||"لا توجد بيانات";
+
+ // التنبيهات
+ const late=act.filter(x=>days(x.d)<0),soon=act.filter(x=>{const n=days(x.d);return n>=0&&n<=al});
+ $("al1").innerHTML=late.map(x=>item(x,al)).join("")||"لا يوجد";
+ $("al2").innerHTML=soon.map(x=>item(x,al)).join("")||"لا يوجد";
+ const bd=$("bd"),cnt=late.length+soon.length;
+ bd.style.display=cnt?"block":"none";bd.textContent=cnt;
+ $("banner").innerHTML=cnt?`<div class="banner" onclick="go('alert')">⚠️ عندك ${late.length} متأخر و ${soon.length} قريب الاستحقاق. اضغط للتفاصيل</div>`:"";
+
+ // الديون + بحث
+ const q=$("q").value.trim().toLowerCase(),fs=$("fs").value;
+ $("list").innerHTML=debts
+  .filter(x=>(!q||x.c.toLowerCase().includes(q))&&(!fs||(fs==="paid"?rem(x)<=0:rem(x)>0&&st(days(x.d),al)===fs)))
+  .map(x=>item(x,al)).join("")||"لا توجد نتائج";
+
+ // السداد
+ $("pd").innerHTML=act.map(x=>`<option value="${x.id}">${x.c} — ${fmt(rem(x))} ${x.u}</option>`).join("")||'<option value="">لا توجد ديون قائمة</option>';
+ $("pl").innerHTML=pays.map(p=>`<div class="item"><div>${p.c} — ${fmt(p.amt)} ${p.u}<br><small>${p.date}</small></div>
+  <div class="acts"><button class="red" onclick="undoPay(${p.id})">↩</button></div></div>`).join("")||"لا توجد مدفوعات";
+
+ // الإحصائيات
+ const orig={},paid={},intr={};
+ debts.forEach(x=>{orig[x.u]=(orig[x.u]||0)+x.a;paid[x.u]=(paid[x.u]||0)+(x.p||0);
+  intr[x.u]=(intr[x.u]||0)+rem(x)*x.r/100});
+ const big=act.slice().sort((a,b)=>rem(b)-rem(a))[0];
+ $("st1").innerHTML="<b>الأصل:</b><br>"+lines(orig)+"<br><b>المسدد:</b><br>"+lines(paid)+
+  "<br><b>المتبقي:</b><br>"+lines(tot)+"<br><b>الفوائد السنوية (على المتبقي):</b><br>"+lines(intr)+
+  "<br><b>أكبر دين:</b> "+(big?big.c+" — "+fmt(rem(big))+" "+big.u:"لا يوجد");
+ const by={};act.forEach(x=>{const k=x.c+" ("+x.u+")";by[k]=(by[k]||0)+rem(x)});
+ const bm=Math.max(1,...Object.values(by));
+ $("st2").innerHTML=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+  `<small>${k}: ${fmt(v)}</small><div class="bar" style="width:${v/bm*100}%"></div>`).join("")||"لا توجد بيانات";
+ $("st3").innerHTML="<b>نسبة السداد</b>"+Object.keys(orig).map(k=>{
+  const pc=orig[k]?Math.round((paid[k]||0)/orig[k]*100):0;
+  return `<br><small>${k}: ${pc}%</small><div class="bar g" style="width:${pc}%"></div>`}).join("");
+
+ renderCal();
+}
+render();
+</script></body></html>
